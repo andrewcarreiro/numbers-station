@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>Demo</title>
+		<meta charset="utf-8">
+		<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+		<meta name="description" content="Demo project">
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<link href='https://fonts.googleapis.com/css?family=Cardo:700' rel='stylesheet' type='text/css'>
+		<style type="text/css">
+		body{
+			background-color:#000;
+			background-position: top left;
+			background-repeat: repeat;
+			color:#FFF;
+			font-family: 'Cardo', serif;
+			font-weight:bold;
+		}
+		#numbers{
+			font-size: 200px;
+			line-height: 200px;
+			text-align: center;
+			top: 50%;
+			position: fixed;
+			width: 100%;
+			margin-top: -100px;
+			-webkit-transition: opacity 500ms ease-in-out;
+			-moz-transition: opacity 500ms ease-in-out;
+			transition: opacity 500ms ease-in-out;
+		}
+		#numbers.hidden{
+			opacity:0;
+		}
+		</style>
+	</head>
+	<body id="bg">
+		<div id="numbers"></div>
+	</body>
+	<script src="/socket.io/socket.io.js"></script>
+	<script>
+	  var socket = io.connect('http://localhost:3000');
+	  var el_numbers = document.getElementById("numbers");
+	  var body = document.getElementById("bg");
+
+	  var ac = new (window.AudioContext || window.webkitAudioContext)();
+	  socket.on('number', function (data) {
+	  	var getAudioReady = new Promise( function ( resolve, reject ){
+		  	ac.decodeAudioData( data.audio, resolve, reject );
+		});
+
+	  	var fadeOutNumber = new Promise( function ( resolve, reject ){
+	  		el_numbers.classList.add('hidden');
+	  		setTimeout( resolve, 500 );
+	  	});
+
+	  	Promise.all([getAudioReady,fadeOutNumber])
+	  	.then( function ( results ){
+			el_numbers.innerHTML = data.number;
+	  		el_numbers.classList.remove('hidden');
+	  		playSound(results[0]);
+	  	});
+
+
+	  	var bufferSize = 4096;
+	  	var whiteNoise = ac.createScriptProcessor(bufferSize, 1, 1);
+	  	whiteNoise.onaudioprocess = function ( e ){
+	  		var output = e.outputBuffer.getChannelData(0);
+	  		for( var i=0; i<bufferSize; i++ ){
+	  			output[i] = Math.random() * 2 - 1;
+	  		}
+	  	};
+	  	var whiteNoiseGain = ac.createGain();
+	  	whiteNoiseGain.gain.value = 0.05;
+	  	whiteNoise.connect(whiteNoiseGain);
+	  	whiteNoiseGain.connect(ac.destination);
+	  });
+
+	  function playSound ( buffer ){
+	  	var source = ac.createBufferSource();
+	  	source.buffer = buffer;
+	  	source.connect(ac.destination);
+	  	source.start(0);
+	  }
+
+	  socket.on('bg-change', changebg)
+
+	  function changebg ( data ) {
+		bg.style.backgroundImage = "url(data:image/png;base64,"+data.image+")";
+	  }
+	</script>
+</html>
